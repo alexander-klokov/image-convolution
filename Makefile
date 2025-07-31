@@ -19,6 +19,9 @@ build:
 run:
 	$(BUILD_DIR)/$(EXECUTABLE_NAME) ${INPUT} ${OUTPUT}
 
+npp:
+	$(BUILD_DIR)/image_npp_conv ${INPUT} ${OUTPUT}
+
 see:
 	gimp ${OUTPUT}
 

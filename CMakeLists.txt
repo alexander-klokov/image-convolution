@@ -18,6 +18,8 @@ file(MAKE_DIRECTORY ${OUTPUT_DIR})
 set(PROFILE_DIR "${PROJECT_SOURCE_DIR}/profile")
 file(MAKE_DIRECTORY ${PROFILE_DIR})
 
+find_package(CUDAToolkit REQUIRED COMPONENTS CUDAToolkit::nppc nppi)
+
 # in debug mode, add debug symbols to device code
 # this disables most optimizations and kills performance
 add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-in-ptx>")
@@ -29,7 +31,11 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 # Configure the source file path to be compiled
 aux_source_directory(${PROJECT_SOURCE_DIR}/src SRC)
 
-# generate executable
-add_executable(image_conv src/image_conv.cu ${SRC})
+# generate executables
+add_executable(image_conv src/image_conv.cu src/image_utils.cpp)
 set_target_properties(image_conv PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
+target_link_libraries(image_conv ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
+
+add_executable(image_npp_conv src/image_npp_conv.cu src/image_utils.cpp)
+set_target_properties(image_npp_conv PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
+target_link_libraries(image_npp_conv ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
