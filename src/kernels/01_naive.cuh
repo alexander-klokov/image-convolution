@@ -9,10 +9,10 @@
 
 // Implements a 31x31 Box Blur convolution
 __global__ void naiveConvolution(unsigned char* d_inputImage, unsigned char* d_outputImage, int width, int height) {
-    // 31x31 Box Blur Kernel (all elements 1/961)
+    // 31x31 Box Blur Kernel (all elements 1/1681)
     // Declared directly in kernel for simplicity in naive version.
     // In optimized version, this would be in constant memory or passed.
-    const short kernelSize = 31;
+    const short kernelSize = 41;
     const short kernelSize2 = kernelSize * kernelSize;
 
     float kernel[kernelSize2];
