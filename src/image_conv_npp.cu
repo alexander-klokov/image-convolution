@@ -36,82 +36,66 @@ void save_pgm(const std::vector<Npp8u>& image, int width, int height, const std:
 
 
 int main(int argc, char** argv) {
-    // --- 1. Define Image and Kernel Parameters ---
-    const int image_width = 4032;
-    const int image_height = 3024;
+
+    std::string inputFilename = argv[1];
+    std::string outputFilename = argv[2];
+    
+    // input image
+    Image inputImage = loadImage(inputFilename);
+    const short image_width = inputImage.width;
+    const short image_height = inputImage.height;
+    
+    // convolution kernel
     const int kernel_size = 41;
     const int kernel_elements = kernel_size * kernel_size;
+    std::vector<Npp32s> hKernel(kernel_elements, 1); // a simple box filter
+    NppiPoint oAnchor = {kernel_size / 2, kernel_size / 2}; // center of the kernel
+    int divisor = kernel_elements; // for a box filter, the divisor is the sum of elements.
 
-    // --- 2. Host Memory Allocation and Initialization ---
-    std::string inputFilename = argv[1];
-    Image inputImage = loadImage(inputFilename);
-
-    // Convolution Kernel (host)
-    std::vector<Npp32s> hKernel(kernel_elements, 1); // A simple box filter
-    int divisor = kernel_elements; // For a box filter, the divisor is the sum of elements.
-
-    // --- 3. Device Memory Allocation ---
+    // device memory allocation
     Npp8u* dSrc = nullptr;
     Npp8u* dDst = nullptr;
     Npp32s* dKernel = nullptr;
     size_t dSrcStep, dDstStep;
 
-    // Allocate source image memory with pitch for optimal access
+    // -- source image
     checkCudaErrors(cudaMallocPitch(&dSrc, &dSrcStep, image_width * sizeof(Npp8u), image_height));
     
-    // Calculate the size of the destination image
+    // -- destination image
     NppiSize oKernelSize = {kernel_size, kernel_size};
     NppiSize oSizeROI = {image_width - kernel_size + 1, image_height - kernel_size + 1};
 
-    // Allocate destination image memory with pitch
     checkCudaErrors(cudaMallocPitch(&dDst, &dDstStep, oSizeROI.width * sizeof(Npp8u), oSizeROI.height));
 
-    // Allocate kernel memory on the device
+    // -- kernel
     checkCudaErrors(cudaMalloc(&dKernel, kernel_elements * sizeof(Npp32s)));
 
-    // --- 4. Copy Host Data to Device ---
-    // Copy source image to device
+    // transfer data: H2D
+    // -- source image
     checkCudaErrors(cudaMemcpy2D(dSrc, dSrcStep, inputImage.data.data(), image_width * sizeof(Npp8u),
-                                 image_width * sizeof(Npp8u), image_height, cudaMemcpyHostToDevice));
-    
-    // Copy kernel to device
+                                 image_width * sizeof(Npp8u), image_height, cudaMemcpyHostToDevice));    
+    // -- kernel
     checkCudaErrors(cudaMemcpy(dKernel, hKernel.data(), kernel_elements * sizeof(Npp32s), cudaMemcpyHostToDevice));
 
-    // --- 5. Perform the Convolution ---
-    // Define the anchor point (center of the kernel)
-    NppiPoint oAnchor = {kernel_size / 2, kernel_size / 2};
-
-    std::cout << "Starting 41x41 convolution on a 4032x3024 image..." << std::endl;
-
-    // Call the NPP function
+    // convolution
     NppStatus nppStatus = nppiFilter_8u_C1R(dSrc, dSrcStep, dDst, dDstStep, 
                                              oSizeROI, dKernel, oKernelSize, 
                                              oAnchor, divisor);
-
-    // Synchronize the device to ensure the operation is complete
     checkCudaErrors(cudaDeviceSynchronize());
-    std::cout << "Convolution complete." << std::endl;
 
-    // --- 6. Copy Result Back to Host and Clean Up ---
-    // Allocate host memory for the result
+    // transfer data: D2H
     std::vector<Npp8u> hDst(oSizeROI.width * oSizeROI.height);
     
-    // Copy the result from device to host
     checkCudaErrors(cudaMemcpy2D(hDst.data(), oSizeROI.width * sizeof(Npp8u), dDst, dDstStep,
                                  oSizeROI.width * sizeof(Npp8u), oSizeROI.height, cudaMemcpyDeviceToHost));
     
-    save_pgm(hDst, oSizeROI.width, oSizeROI.height, "output.pgm");
+    // save the filtered image
+    save_pgm(hDst, oSizeROI.width, oSizeROI.height, outputFilename);
 
-
-    
-
-    // Clean up device memory
+    // clean up device memory
     cudaFree(dSrc);
     cudaFree(dDst);
     cudaFree(dKernel);
-
-    std::cout << "Result copied to host memory and device memory freed." << std::endl;
-    // You can now process or save the hDst vector.
 
     return 0;
 }

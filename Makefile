@@ -1,14 +1,16 @@
-.PHONY: all build run clean see nsys ncu
+.PHONY: all build run clean see 
 
 # executable
 BUILD_DIR = build
-EXECUTABLE_NAME = image_conv
+EXECUTABLE_NAME_KERNEL = image_conv_kernel
+EXECUTABLE_NAME_NPP = image_conv_npp
 
-# input/output images
+
+# input/output
 INPUT=input/pebble.pgm
-OUTPUT=output/pebble_blurred.pgm
+OUTPUT_NPP=output/pebble_blurred_npp.pgm
+OUTPUT_KERNEL=output/pebble_blurred_kernel.pgm
 
-# profiling
 REPORT_NCU=profile/report_ncu
 
 build:
@@ -16,19 +18,31 @@ build:
 	@cd $(BUILD_DIR) && cmake ..
 	@cd $(BUILD_DIR) && cmake --build .
 
-run:
-	$(BUILD_DIR)/$(EXECUTABLE_NAME) ${INPUT} ${OUTPUT}
 
-npp:
-	$(BUILD_DIR)/image_npp_conv ${INPUT} ${OUTPUT}
+# kernel run
+run:
+	$(BUILD_DIR)/$(EXECUTABLE_NAME_KERNEL) ${INPUT} ${OUTPUT_KERNEL}
 
 see:
-	gimp ${OUTPUT}
+	gimp ${OUTPUT_KERNEL}
+
+# npp run
+run_npp:
+	$(BUILD_DIR)/$(EXECUTABLE_NAME_NPP) ${INPUT} ${OUTPUT_NPP}
+
+see_npp:
+	gimp ${OUTPUT_NPP}
+
 
 # profiling
-ncu:
-	ncu -o ${REPORT_NCU} \
-	$(BUILD_DIR)/$(EXECUTABLE_NAME) ${INPUT} ${OUTPUT}
+profile:
+	ncu -o ${REPORT_NCU_KERNEL} \
+	$(BUILD_DIR)/$(EXECUTABLE_NAME_KERNEL) ${INPUT} ${OUTPUT_KERNEL}
+
+profile_npp:
+	ncu -o ${REPORT_NCU_NPP} \
+	$(BUILD_DIR)/$(EXECUTABLE_NAME_NPP) ${INPUT} ${OUTPUT_NPP}
+
 
 # clean up
 clean:
