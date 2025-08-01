@@ -1,100 +1,117 @@
 #include <iostream>
 #include <vector>
-#include <cuda_runtime.h>
+#include <numeric>
+#include <fstream>
+
 #include <npp.h>
+#include <nppi.h>
+#include <cuda_runtime.h>
 
 #include "image_utils.h"
 
-// Helper function to handle CUDA errors
-#define CUDA_CHECK(call)                                                          \
-    do {                                                                          \
-        cudaError_t err = call;                                                   \
-        if (err != cudaSuccess) {                                                 \
-            std::cerr << "CUDA Error at " << __FILE__ << ":" << __LINE__          \
-                      << " - " << cudaGetErrorString(err) << std::endl;           \
-            exit(EXIT_FAILURE);                                                   \
-        }                                                                         \
-    } while (0)
+// Helper function to check for CUDA errors
+void checkCudaErrors(cudaError_t err) {
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
 
-// Helper function to handle NPP errors
-#define NPP_CHECK(call)                                                           \
-    do {                                                                          \
-        NppStatus status = call;                                                  \
-        if (status != NPP_SUCCESS) {                                              \
-            std::cerr << "NPP Error at " << __FILE__ << ":" << __LINE__           \
-                      << " - " << nppGetErrorString(status) << std::endl;         \
-            exit(EXIT_FAILURE);                                                   \
-        }                                                                         \
-    } while (0)
+void save_pgm(const std::vector<Npp8u>& image, int width, int height, const std::string& filename) {
+    std::ofstream file(filename, std::ios::binary);
+    if (!file) {
+        std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
+        return;
+    }
+
+    // Write PGM header (P5 format)
+    file << "P5\n" << width << " " << height << "\n255\n";
+
+    // Write image data
+    file.write(reinterpret_cast<const char*>(image.data()), width * height);
+
+    file.close();
+    std::cout << "Image successfully written to " << filename << std::endl;
+}
+
 
 int main(int argc, char** argv) {
+    // --- 1. Define Image and Kernel Parameters ---
+    const int image_width = 4032;
+    const int image_height = 3024;
+    const int kernel_size = 41;
+    const int kernel_elements = kernel_size * kernel_size;
 
+    // --- 2. Host Memory Allocation and Initialization ---
     std::string inputFilename = argv[1];
-    std::string outputFilename = argv[2];
-
     Image inputImage = loadImage(inputFilename);
-    if (inputImage.channels != 1) {
-        std::cerr << "Error: This naive convolution code expects a grayscale (P5) image. Please provide a .pgm file." << std::endl;
-        return 1;
-    }
-    std::cout << "Loaded image: " << inputFilename << " (" << inputImage.width << "x" << inputImage.height << ", " << inputImage.channels << " channels)\n";
 
-    // Prepare output image buffer
-    Image outputImage = inputImage; // Copy metadata, data will be overwritten
-    outputImage.data.assign(inputImage.data.size(), 0); // Initialize with zeros
+    // Convolution Kernel (host)
+    std::vector<Npp32s> hKernel(kernel_elements, 1); // A simple box filter
+    int divisor = kernel_elements; // For a box filter, the divisor is the sum of elements.
 
-    // 1. Define image dimensions and convolution filter
-    const int width = inputImage.width;
-    const int height = inputImage.height;
-    const int image_size_bytes = width * height * sizeof(Npp8u);
+    // --- 3. Device Memory Allocation ---
+    Npp8u* dSrc = nullptr;
+    Npp8u* dDst = nullptr;
+    Npp32s* dKernel = nullptr;
+    size_t dSrcStep, dDstStep;
 
-    // Define the convolution kernel (3x3 box filter)
-    // The filter values are normalized later by the NPP function
-    const Npp32s filter_size = 41;
-    const Npp32s filter_dim = filter_size * filter_size;
-    std::vector<Npp32s> h_kernel(filter_dim, 1 / (41.f * 41.f));
+    // Allocate source image memory with pitch for optimal access
+    checkCudaErrors(cudaMallocPitch(&dSrc, &dSrcStep, image_width * sizeof(Npp8u), image_height));
+    
+    // Calculate the size of the destination image
+    NppiSize oKernelSize = {kernel_size, kernel_size};
+    NppiSize oSizeROI = {image_width - kernel_size + 1, image_height - kernel_size + 1};
 
-    // NPP requires a kernel size, which is half the filter dimension on each side
-    NppiSize oKernelSize = {filter_size, filter_size};
+    // Allocate destination image memory with pitch
+    checkCudaErrors(cudaMallocPitch(&dDst, &dDstStep, oSizeROI.width * sizeof(Npp8u), oSizeROI.height));
 
-    // 2. Allocate device memory
-    Npp8u* d_src = nullptr;
-    Npp8u* d_dst = nullptr;
-    Npp32s* d_kernel = nullptr;
+    // Allocate kernel memory on the device
+    checkCudaErrors(cudaMalloc(&dKernel, kernel_elements * sizeof(Npp32s)));
 
-    CUDA_CHECK(cudaMalloc((void**)&d_src, image_size_bytes));
-    CUDA_CHECK(cudaMalloc((void**)&d_dst, image_size_bytes));
-    CUDA_CHECK(cudaMalloc((void**)&d_kernel, filter_dim * sizeof(Npp32s)));
+    // --- 4. Copy Host Data to Device ---
+    // Copy source image to device
+    checkCudaErrors(cudaMemcpy2D(dSrc, dSrcStep, inputImage.data.data(), image_width * sizeof(Npp8u),
+                                 image_width * sizeof(Npp8u), image_height, cudaMemcpyHostToDevice));
+    
+    // Copy kernel to device
+    checkCudaErrors(cudaMemcpy(dKernel, hKernel.data(), kernel_elements * sizeof(Npp32s), cudaMemcpyHostToDevice));
 
-    // 3. Copy data from host to device
-    CUDA_CHECK(cudaMemcpy(d_src, inputImage.data.data(), image_size_bytes, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_kernel, h_kernel.data(), filter_dim * sizeof(Npp32s), cudaMemcpyHostToDevice));
+    // --- 5. Perform the Convolution ---
+    // Define the anchor point (center of the kernel)
+    NppiPoint oAnchor = {kernel_size / 2, kernel_size / 2};
 
-    // 4. Set up image and kernel data structures
-    NppiSize oSrcSize = {width, height};
-    NppiPoint oSrcOffset = {0, 0};
-    Npp32s nDivisor = filter_dim; // Normalization divisor
+    std::cout << "Starting 41x41 convolution on a 4032x3024 image..." << std::endl;
 
-    // 5. Call the NPP convolution function
-    // NppiFilter_8u_C1R: 8-bit unsigned, 1 channel, ROI (Region of Interest)
-  
-    nppiFilter_8u_C1R(d_src, 1,
-                      d_dst, 1, 
-                      oSrcSize, 
-                      d_kernel, 
-                      oKernelSize, 
-                      oSrcOffset, 
-                      nDivisor);
+    // Call the NPP function
+    NppStatus nppStatus = nppiFilter_8u_C1R(dSrc, dSrcStep, dDst, dDstStep, 
+                                             oSizeROI, dKernel, oKernelSize, 
+                                             oAnchor, divisor);
 
-    // 6. Copy the result back from device to host
-    CUDA_CHECK(cudaMemcpy(outputImage.data.data(), d_src, image_size_bytes, cudaMemcpyDeviceToHost));
-    saveImage(outputFilename, outputImage);
+    // Synchronize the device to ensure the operation is complete
+    checkCudaErrors(cudaDeviceSynchronize());
+    std::cout << "Convolution complete." << std::endl;
 
-    CUDA_CHECK(cudaFree(d_src));
-    CUDA_CHECK(cudaFree(d_dst));
-    CUDA_CHECK(cudaFree(d_kernel));
+    // --- 6. Copy Result Back to Host and Clean Up ---
+    // Allocate host memory for the result
+    std::vector<Npp8u> hDst(oSizeROI.width * oSizeROI.height);
+    
+    // Copy the result from device to host
+    checkCudaErrors(cudaMemcpy2D(hDst.data(), oSizeROI.width * sizeof(Npp8u), dDst, dDstStep,
+                                 oSizeROI.width * sizeof(Npp8u), oSizeROI.height, cudaMemcpyDeviceToHost));
+    
+    save_pgm(hDst, oSizeROI.width, oSizeROI.height, "output.pgm");
 
-    std::cout << "NPP convolution successful!" << std::endl;
+
+    
+
+    // Clean up device memory
+    cudaFree(dSrc);
+    cudaFree(dDst);
+    cudaFree(dKernel);
+
+    std::cout << "Result copied to host memory and device memory freed." << std::endl;
+    // You can now process or save the hDst vector.
 
     return 0;
 }
