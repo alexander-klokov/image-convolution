@@ -1,4 +1,4 @@
-.PHONY: all build run clean see 
+.PHONY: all build run see profile run_npp see_npp profile_npp clean
 
 # executable
 BUILD_DIR = build
@@ -11,7 +11,8 @@ INPUT=input/pebble.pgm
 OUTPUT_NPP=output/pebble_blurred_npp.pgm
 OUTPUT_KERNEL=output/pebble_blurred_kernel.pgm
 
-REPORT_NCU=profile/report_ncu
+REPORT_NCU_KERNEL=profile/report_ncu_kernel
+REPORT_NCU_NPP=profile/report_ncu_npp
 
 build:
 	@mkdir -p $(BUILD_DIR)

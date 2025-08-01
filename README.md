@@ -12,9 +12,8 @@ As input, I am taking a PGM image. A PGM image (Portable Gray Map) is a straight
 
 I’m using a straightforward yet extended convolution kernel - a 41x41 box filter. That makes the convolution computationally intense, offering significant room for optimization, and produces a pleasantly blurred output image.
 
+I'm working locally using NVIDIA GeForce RTX 4060 Laptop GPU.
+
 ## Kernel 1: Naive Implementation
 
 In this straightforward approach, each thread processes a specific pixel in the output image.
-
-
-
