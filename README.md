@@ -14,6 +14,25 @@ I’m using a straightforward yet extended convolution kernel - a 41x41 box filt
 
 I'm working locally using NVIDIA GeForce RTX 4060 Laptop GPU.
 
+## Benchmark: nppiFilter_8u_C1R
+
+_nppiFilter_8u_C1R_ is a CPU function, not a GPU kernel. When invoked, it does the following:
+
+- prepares data structures and parameters, including calculating the optimal _gridSize_ and _blockSize_;
+- launches pre-compiled kernels optimized for the input image and the specific GPU architecture;
+- Handles synchronization and data flow.
+
+The automatically selected kernel _ForEachPixelNaiveInLargeImage_ demonstrated nearly perfect performance:
+
+- Compute Throughput (%): 99.68
+- Memory Throughput (%): 99.68
+- Duration (ms): 93
+
+It's interesting to note the parameters chosen:
+
+- Grid Size: (125, 373, 1)
+- Block Size: (32, 8, 1)
+
 ## Kernel 1: Naive Implementation
 
 In this straightforward approach, each thread processes a specific pixel in the output image.
