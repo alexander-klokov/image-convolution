@@ -32,9 +32,9 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src SRC)
 
 # generate executables
-add_executable(image_conv_kernel src/image_conv_kernel.cu src/image_utils.cpp)
-set_target_properties(image_conv_kernel PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_kernel ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
+add_executable(image_conv_kernel_1a src/image_conv_kernel_1a.cu src/image_utils.cpp)
+set_target_properties(image_conv_kernel_1a PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
+target_link_libraries(image_conv_kernel_1a ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
 
 add_executable(image_conv_npp src/image_conv_npp.cu src/image_utils.cpp)
 set_target_properties(image_conv_npp PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})

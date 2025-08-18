@@ -33,6 +33,6 @@ It's interesting to note the parameters chosen:
 - Grid Size: (125, 373, 1)
 - Block Size: (32, 8, 1)
 
-## Kernel 1: Naive Implementation
+## Kernel 1a: Naive Implementation
 
 In this straightforward approach, each thread processes a specific pixel in the output image.
