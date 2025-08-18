@@ -32,10 +32,15 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src SRC)
 
 # generate executables
-add_executable(image_conv_kernel_1a src/image_conv_kernel_1a.cu src/image_utils.cpp)
-set_target_properties(image_conv_kernel_1a PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_kernel_1a ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
-
+### npp (benchmark)
 add_executable(image_conv_npp src/image_conv_npp.cu src/image_utils.cpp)
 set_target_properties(image_conv_npp PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 target_link_libraries(image_conv_npp ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
+### 1a
+add_executable(image_conv_kernel_1a src/image_conv_kernel_1a.cu src/image_utils.cpp)
+set_target_properties(image_conv_kernel_1a PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
+target_link_libraries(image_conv_kernel_1a ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
+### 1b
+add_executable(image_conv_kernel_1b src/image_conv_kernel_1b.cu src/image_utils.cpp)
+set_target_properties(image_conv_kernel_1b PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
+target_link_libraries(image_conv_kernel_1b ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)

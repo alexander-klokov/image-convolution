@@ -35,4 +35,30 @@ It's interesting to note the parameters chosen:
 
 ## Kernel 1a: Naive Implementation
 
-In this straightforward approach, each thread processes a specific pixel in the output image.
+In this straightforward approach, each thread processes a specific pixel in the output image. I've set the block size to 32 and, then, determined the grid size by overlaying the input image with these blocks.
+
+The kernel is not performing enough arithmetic work:
+
+- Compute Throughput (%): 16.56
+- Memory Throughput (%): 90.26
+- Duration (ms): 712
+
+with
+
+- Grid Size: (126, 95, 1)
+- Block Size: (32, 32, 1)
+
+## Kernel 1b: Naive Implementation with Optimal Run Parameters
+
+Before getting to any optimization, I ran the same naive kernel using the run parameters recommended by the NVIDIA Performance Primitives (NPP) function. Only a small improvement was achieved:
+
+- Compute Throughput (%): 17.20
+- Memory Throughput (%): 91.32
+- Duration (ms): 682
+
+with
+
+- Grid Size: (126, 378, 1)
+- Block Size: (32, 8, 1)
+
+
