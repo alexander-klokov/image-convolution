@@ -108,3 +108,17 @@ with
 The most important lesson from this analysis is that high occupancy does not guarantee high performance. My kernel's poor performance is primarily due to its memory-bound nature, and its low occupancy is a symptom of excessive resource consumption, specifically a high register count.
 
 The Occupancy Calculator models that a decrease in my kernel's register usage from 56 to 48 could increase my theoretical occupancy to 83.33%. The next major milestone is to target 100% occupancy, which would require bringing my register usage down to 40 or fewer registers per thread. Note that this aligns with the register usage of the optimized NPP library (37 registers used).
+
+## Kernel 2: Constant Propagation
+
+In the naive implementation, I'm naively declaring the filter as an array of length 1681, containing a constant value
+
+- **Compute Throughput (%): 88.33**
+- **Memory Throughput (%): 66.11**
+- **Duration (ms): 71**
+
+with
+
+- **Grid Size: (126, 252, 1)**
+- **Block Size: (32, 12, 1)**
+- **Registers (register/thread): 33**
