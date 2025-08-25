@@ -38,7 +38,7 @@ see:
 	gimp ${OUTPUT_KERNEL}
 
 profile:
-	ncu -o ${REPORT_NCU_KERNEL}_${VERSION} \
+	ncu -o ${REPORT_NCU_KERNEL}_${VERSION} -f \
 	$(BUILD_DIR)/$(EXECUTABLE_NAME_KERNEL)_${VERSION} ${INPUT} ${OUTPUT_KERNEL}_${VERSION}.pgm
 
 # clean up

@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
     CHECK_CUDA_ERROR(cudaMemcpy(d_inputImage, inputImage.data.data(), imageSize, cudaMemcpyHostToDevice));
 
     // Define kernel launch parameters
-    dim3 threadsPerBlock(32, 8);
+    dim3 threadsPerBlock(32, 12);
     dim3 numBlocks(
         (inputImage.width + threadsPerBlock.x - 1) / threadsPerBlock.x,
         (inputImage.height + threadsPerBlock.y - 1) / threadsPerBlock.y
