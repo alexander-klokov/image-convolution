@@ -5,28 +5,31 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-__global__ void kernelConstantPropagation (
-    unsigned char* d_inputImage,
-    unsigned char* d_outputImage,
+__global__ void kernelConstantPropagation(
+    unsigned char *d_inputImage,
+    unsigned char *d_outputImage,
     int width,
     int height,
     const int filterRadius,
-    const float filterValue
-) {
+    const float filterValue)
+{
 
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
 
     // check if the current thread is within image bounds
-    if (col >= width || row >= height) {
+    if (col >= width || row >= height)
+    {
         return;
     }
 
     float sum = 0.0f;
 
     // iterate over the filter window
-    for (int kRow = -filterRadius; kRow <= filterRadius; ++kRow) {
-        for (int kCol = -filterRadius; kCol <= filterRadius; ++kCol) {
+    for (int kRow = -filterRadius; kRow <= filterRadius; ++kRow)
+    {
+        for (int kCol = -filterRadius; kCol <= filterRadius; ++kCol)
+        {
             int inputRow = row + kRow;
             int inputCol = col + kCol;
 

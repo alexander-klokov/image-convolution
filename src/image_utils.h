@@ -4,15 +4,20 @@
 #include <string>
 #include <vector>
 
-struct Image {
+#include <cuda_runtime.h>
+
+struct Image
+{
     std::vector<unsigned char> data;
     int width;
     int height;
     int channels; // 1 for grayscale, 3 for RGB
 };
 
-Image loadImage(const std::string& filename);
+Image loadImage(const std::string &filename);
 
-void saveImage(const std::string& filename, const Image& img);
+void saveImage(const std::string &filename, const Image &img);
+
+void check(cudaError_t err, const char *const func, const char *const file, const int line);
 
 #endif
