@@ -32,10 +32,10 @@ profile_npp:
 
 # kernel
 run:
-	$(BUILD_DIR)/$(EXECUTABLE_NAME_KERNEL)_${VERSION} ${INPUT} ${OUTPUT_KERNEL}
+	$(BUILD_DIR)/$(EXECUTABLE_NAME_KERNEL)_${VERSION} ${INPUT} ${OUTPUT_KERNEL}_${VERSION}.pgm
 
 see:
-	gimp ${OUTPUT_KERNEL}
+	gimp ${OUTPUT_KERNEL}_${VERSION}.pgm
 
 profile:
 	ncu -o ${REPORT_NCU_KERNEL}_${VERSION} -f \
