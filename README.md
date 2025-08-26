@@ -25,9 +25,11 @@ I plan to develop a basic image convolution CUDA kernel and enhance it through i
 
 As input, I am taking a PGM image. A PGM image (Portable Gray Map) is a straightforward file format for storing 2D grayscale images, with each pixel representing a shade of gray. The single channel of the image simplifies the problem.
 
+<img src="assets/pebble.jpg" width=400 />
+
 I’m using a straightforward yet extended convolution kernel - a 41x41 box filter. That makes the convolution computationally intense, offering significant room for optimization, and produces a pleasantly blurred output image.
 
-I'm working locally using NVIDIA GeForce RTX 4060 Laptop GPU.
+I'm working locally using **NVIDIA GeForce RTX 4060 Laptop GPU**.
 
 ## Benchmark: nppiFilter_8u_C1R
 
@@ -101,7 +103,10 @@ To increase occupancy, I need to reduce the resource usage per block. I have two
 
 ### Getting Optimal Block Size
 
-The Occupancy Calculator suggests a few options for optimal threads per block, each of which leads to a theoretical occupancy of 75%.
+The Occupancy Calculator suggests a few options for optimal threads per block, each of which leads to a theoretical occupancy of 75%:
+
+<img src="assets/occupancy_1b.png" />
+
 I'm picking 384 threads because this is a multiple of both 32 and 64, which is generally good for memory coalescing and warp scheduling.
 
 For a block size of 384 threads, the register usage per block drops to _384 threads × 56 registers/thread = 21,504 registers_. This would allow my SM to run _three_ thread blocks simultaneously, increasing the number of active warps to _3 blocks × 12 warps/block = 36 warps_. With that, the theoretical occupancy is _36 active warps / 48 max warps = 75%_.
