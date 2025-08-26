@@ -44,7 +44,7 @@ The kernel is not performing enough arithmetic work:
 - **Memory Throughput (%): 90.26**
 - **Duration (ms): 712**
 
-with
+with the following launch parameters:
 
 - **Grid Size: (126, 95, 1)**
 - **Block Size: (32, 32, 1)**
@@ -99,7 +99,7 @@ The optimized launch parameters allowed me to achieve an occupancy of 72.38%. Ho
 - **Memory Throughput (%): 90.46**
 - **Duration (ms): 703**
 
-with
+with the following launch parameters:
 
 - **Grid Size: (126, 252, 1)**
 - **Block Size: (32, 12, 1)**
@@ -111,14 +111,29 @@ The Occupancy Calculator models that a decrease in my kernel's register usage fr
 
 ## Kernel 2: Constant Propagation
 
-In the naive implementation, I'm naively declaring the filter as an array of length 1681, containing a constant value
+In the naive implementation, I'm declaring the filter as an array inside the kernel. This array contains a constant value, but it is naively declared per-thread, and the values are calculated within each thread.
+
+Each thread declares a float array, which forces a large allocation of local memory. This memory is a resource that limits occupancy. A 41x41 float array is _1681×4 bytes = 6724 bytes per thread_. My NVIDIA GeForce RTX 4060 has a hardware limit of 255 registers per thread, which is _255×4 bytes = 1020 bytes_. Since my filter array is over 6.5 times this limit, the compiler will spill this array to local memory. Local memory is private to each thread but is physically located in the slow, off-chip global memory. In result, I am getting a very significant amount of slow memory usage, which drastically reduces the number of warps that can be active on a Streaming Multiprocessor (SM) at any given time.
+
+The straightforward optimization is to get rid of the array and operate with a single constant float value. To do this, I declare the filter value at the host code and pass it to the device. With this approach, the CUDA compiler and runtime can place the constant in fast, on-chip constant memory. This memory is highly optimized for read-only data that is uniform across a warp, allowing a single value to be broadcast to all 32 threads in a single, efficient operation.
+
+This simple change resolved the memory bottleneck, shifting the kernel's execution to become compute-bound:
 
 - **Compute Throughput (%): 88.33**
 - **Memory Throughput (%): 66.11**
 - **Duration (ms): 71**
 
-with
+with the following launch parameters:
 
 - **Grid Size: (126, 252, 1)**
 - **Block Size: (32, 12, 1)**
 - **Registers (register/thread): 33**
+
+To launch the kernel, I used a launch configuration with 384 threads per block recommended at the previous step.
+That allowed for the achieved occupancy of 97.4% directly leading to an impressive 10x speedup.
+
+The critical observation is the register usage dropped from 56 to 33. In the naive implementation, the large filter array forced the compiler to use a large number of registers. After transitioning to a constant value, the compiler no longer needed to allocate those registers, which freed up resources and led to a higher occupancy.
+
+In fact, I've achieved this dramatic performance boost by following a common sense approach.
+
+At this optimization state, NCU recommends to "balance the number of active cycles across L2 Slices," which suggests the kernel's performance is now being limited by the efficiency of the L2 cache utilization.
