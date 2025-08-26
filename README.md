@@ -6,6 +6,11 @@ Starting this study project, I was inspired by _Simon Boehm_ and his [post](http
 
 I plan to develop a basic image convolution CUDA kernel and enhance it through iterative optimization techniques. For performance comparison, I will use the _nppiFilter_8u_C1R_ function from the NVIDIA Performance Primitives (NPP) library as a benchmark.
 
+## Lessons Learned
+
+- High occupancy does not guarantee high performance.
+- Following common sense could lead to a dramatic performance boost.
+
 ## Input image and the Convolution Kernel
 
 As input, I am taking a PGM image. A PGM image (Portable Gray Map) is a straightforward file format for storing 2D grayscale images, with each pixel representing a shade of gray. The single channel of the image simplifies the problem.
