@@ -8,6 +8,7 @@
 * [Kernel 1a: Naive Implementation](#kernel-1a-naive-implementation)
 * [Kernel 1b: Naive Implementation with Optimal Launch Parameters](#kernel-1b-naive-implementation-with-optimal-launch-parameters)
 * [Kernel 2: Constant Propagation](#kernel-2-constant-propagation)
+* [Kernel 3: Tiling](#kernel-3-tiling)
 
 ## Motivation
 
@@ -151,3 +152,33 @@ The critical observation is the register usage dropped from 56 to 33. In the nai
 In fact, I've achieved this dramatic performance boost by following a common sense approach.
 
 At this optimization state, NCU recommends to "balance the number of active cycles across L2 Slices," which suggests the kernel's performance is now being limited by the efficiency of the L2 cache utilization.
+
+## Kernel 3: Tiling
+
+This kernel follows a tiling strategy. It breaks the large input image into smaller, overlapping chunks called "tiles":
+- **Load Phase**: Each thread block loads its corresponding tile from global memory into shared memory.
+- **Compute Phase**: Each thread within the block then performs the computation using the data from the fast shared memory instead of repeatedly accessing the slow global memory.
+
+During the Load Phase, the data is read in a coalesced manner to allow threads in a warp to access contiguous memory addresses. For the filter, I am following the constant propagation strategy.
+
+The kernel uses a shared memory array. With the filter size 41x41 and a tile size of 32x32, that requires _(32 + 41 - 1) * (32 + 41 - 1) = 72 * 72 = 5184 bytes_. For my RTX 4060, each SM has 100 KB of configurable L1 cache/shared memory. The kernel's shared memory usage of ~5 KB per block is well within this limit.
+
+The kernel appears well-balanced with high throughput values:
+
+- **Compute Throughput (%): 93.01**
+- **Memory Throughput (%): 93.01**
+- **Duration (ms): 51**
+
+with the following launch parameters:
+
+- **Grid Size: (126, 95, 1)**
+- **Block Size: (32, 32, 1)**
+- **Registers (register/thread): 36**
+
+The Occupancy Calculator reveals a linear dependency between Occupancy and the number of Threads per Block:
+
+<img src="assets/occupancy_03.png" />
+
+This is a feature of shared memory, which becomes the new limiting factor for occupancy. Unlike registers, which are allocated on a per-thread basis, shared memory is allocated per thread block. The amount of shared memory a block requests is a single, fixed value, regardless of the number of threads within that block. Occupancy increases linearly as more threads are added to each block, until it hits a new limit (1024 threads per block). Note that the theoretical occupancy drops to 66.7% even with the observed significant speedup.
+
+After adapting the tiling strategy, I could not address the Profiler's guidance to "balance the number of active cycles across L2 Slices."
