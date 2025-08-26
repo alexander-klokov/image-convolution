@@ -1,5 +1,14 @@
 # CUDA Kernel Optimization for Image Convolution
 
+## Overview
+* [Motivation](#motivation)
+* [Lessons Learned](#lessons-learned)
+* [Input image and the Convolution Kernel](#input-image-and-the-convolution-kernel)
+* [Benchmark: nppiFilter_8u_C1R](#benchmark-nppifilter_8u_c1r)
+* [Kernel 1a: Naive Implementation](#kernel-1a-naive-implementation)
+* [Kernel 1b: Naive Implementation with Optimal Launch Parameters](#kernel-1b-naive-implementation-with-optimal-launch-parameters)
+* [Kernel 2: Constant Propagation](#kernel-2-constant-propagation)
+
 ## Motivation
 
 Starting this study project, I was inspired by _Simon Boehm_ and his [post](https://siboehm.com/articles/22/CUDA-MMM), in which he was optimizing a CUDA Matmul Kernel trying to achieve cuBLAS performance.
