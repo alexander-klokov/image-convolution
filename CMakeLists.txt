@@ -48,3 +48,7 @@ target_link_libraries(image_conv_kernel_1b ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRA
 add_executable(image_conv_kernel_2 src/image_conv_kernel_2.cu src/image_utils.cpp)
 set_target_properties(image_conv_kernel_2 PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 target_link_libraries(image_conv_kernel_2 ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
+### 3
+add_executable(image_conv_kernel_3 src/image_conv_kernel_3.cu src/image_utils.cpp)
+set_target_properties(image_conv_kernel_3 PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
+target_link_libraries(image_conv_kernel_3 ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)

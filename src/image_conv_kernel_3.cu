@@ -20,7 +20,8 @@ int main(int argc, char **argv)
     std::string inputFilename = argv[1];
     std::string outputFilename = argv[2];
 
-    // Load the input image
+    std::cout << argv[1] << " " << argv[2] << std::endl;
+
     Image inputImage = loadImage(inputFilename);
     if (inputImage.channels != 1)
     {
@@ -45,28 +46,32 @@ int main(int argc, char **argv)
     // Copy input image from host to device
     CHECK_CUDA_ERROR(cudaMemcpy(d_inputImage, inputImage.data.data(), imageSize, cudaMemcpyHostToDevice));
 
-    // Define kernel launch parameters
-    int blockSize = 32; // 32x32
-    dim3 threadsPerBlock(blockSize, blockSize);
-    dim3 numBlocks(
-        (inputImage.width + threadsPerBlock.x - 1) / threadsPerBlock.x,
-        (inputImage.height + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    // Filter parameters
+    const short filterSize = 41;
+    const short filterSize2 = filterSize * filterSize;
+    const float filterValue = 1.0f / filterSize2;
 
-    std::cout << "Launching kernelNaive with " << numBlocks.x << "x" << numBlocks.y << " blocks and "
-              << threadsPerBlock.x << "x" << threadsPerBlock.y << " threads per block.\n";
+    // Define kernel launch parameters
+    dim3 blockDim(TILE_WIDTH, TILE_WIDTH);
+    dim3 gridDim((inputImage.width + blockDim.x - 1) / blockDim.x, (inputImage.height + blockDim.y - 1) / blockDim.y);
+
+    std::cout << "Launching kernelTiling with " << gridDim.x << "x" << gridDim.y << " blocks and "
+              << blockDim.x << "x" << blockDim.y << " threads per block.\n";
 
     // Set up CUDA events for timing
     cudaEvent_t start, stop;
     CHECK_CUDA_ERROR(cudaEventCreate(&start));
     CHECK_CUDA_ERROR(cudaEventCreate(&stop));
 
-    // Launch the naive convolution kernel
+    // Launch the kernel
     CHECK_CUDA_ERROR(cudaEventRecord(start));
-    kernelNaive<<<numBlocks, threadsPerBlock>>>(
+    kernelTiling<<<gridDim, blockDim>>>(
         d_inputImage,
         d_outputImage,
         inputImage.width,
-        inputImage.height);
+        inputImage.height,
+        filterValue);
+
     CHECK_CUDA_ERROR(cudaGetLastError()); // Check for errors during kernel execution
     CHECK_CUDA_ERROR(cudaEventRecord(stop));
     CHECK_CUDA_ERROR(cudaEventSynchronize(stop));
@@ -74,8 +79,7 @@ int main(int argc, char **argv)
     // Calculate elapsed time
     float milliseconds = 0;
     CHECK_CUDA_ERROR(cudaEventElapsedTime(&milliseconds, start, stop));
-
-    std::cout << "\033[1;34mkernelNaive execution time: " << milliseconds << " ms\n\033[0m";
+    std::cout << "\033[1;34mkernelTiling execution time: " << milliseconds << " ms\n\033[0m";
 
     // Copy output image from device to host
     CHECK_CUDA_ERROR(cudaMemcpy(outputImage.data.data(), d_outputImage, imageSize, cudaMemcpyDeviceToHost));

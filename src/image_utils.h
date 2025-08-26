@@ -6,6 +6,10 @@
 
 #include <cuda_runtime.h>
 
+// cuda
+void check(cudaError_t err, const char *const func, const char *const file, const int line);
+
+// image
 struct Image
 {
     std::vector<unsigned char> data;
@@ -17,7 +21,5 @@ struct Image
 Image loadImage(const std::string &filename);
 
 void saveImage(const std::string &filename, const Image &img);
-
-void check(cudaError_t err, const char *const func, const char *const file, const int line);
 
 #endif

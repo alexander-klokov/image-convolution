@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     Image inputImage = loadImage(inputFilename);
     if (inputImage.channels != 1)
     {
-        std::cerr << "Error: This naive convolution code expects a grayscale (P5) image. Please provide a .pgm file." << std::endl;
+        std::cerr << "Error: This convolution code expects a grayscale (P5) image. Please provide a .pgm file." << std::endl;
         return 1;
     }
     std::cout << "Loaded image: " << inputFilename << " (" << inputImage.width << "x" << inputImage.height << ", " << inputImage.channels << " channels)\n";
