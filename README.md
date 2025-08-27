@@ -105,11 +105,19 @@ To increase occupancy, I need to reduce the resource usage per block. I have two
 - **Reduce Registers**. The most straightforward way is to refactor the kernel, but this is a task for the next exercise. Another option is to address compiler flags, but then I'm facing potential _register spilling_.
 - **Reduce Block Size**. I'll follow this approach and use the Occupancy Calculator to find the optimal launch parameters for the given kernel.
 
-### Getting Optimal Block Size
+### Occupancy Analysis
 
 The Occupancy Calculator suggests a few options for optimal threads per block, each of which leads to a theoretical occupancy of 75%:
 
 <img src="assets/occupancy_1b.png" />
+
+The occupancy plot reveals a non-linear relationship. The occupancy first remains constant at 33% until it reaches 32 threads per block. This plateau is a direct consequence of the GPU's hardware-based scheduling of warps; the kernel's resource usage allows for only three warps to be resident on the SM, regardless of a block size from 1 to 32 threads.
+
+After 32 threads, the occupancy increases linearly to 67% until 48 threads per block. This rise indicates that the kernel's resource requirements now allow for a higher number of resident warps. The occupancy then varies with peaks and valleys as the block size increases. These fluctuations are typical when the thread block size is not a clean multiple of the warp size (32), causing less-than-optimal resource utilization due to the GPU’s allocation granularity.
+
+Finally, the occupancy drops to 40% at 576 threads per block, after which it begins to increase linearly once more. The linear increase from this point onward signifies that the total number of threads per SM has become the primary limiting factor. Up until this point, the occupancy was dictated by other resource constraints, such as registers or shared memory, but at a block size of 592 and beyond, the kernel is no longer resource-bound and is limited by how many threads can physically fit on the SM.
+
+### Getting Optimal Block Size
 
 I'm picking 384 threads because this is a multiple of both 32 and 64, which is generally good for memory coalescing and warp scheduling.
 
