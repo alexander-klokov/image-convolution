@@ -27,7 +27,11 @@ As input, I am taking a PGM image. A PGM image (Portable Gray Map) is a straight
 
 <img src="assets/pebble.jpg" width=400 />
 
-I’m using a straightforward yet extended convolution kernel - a 41x41 box filter. That makes the convolution computationally intense, offering significant room for optimization, and produces a pleasantly blurred output image.
+I’m using a straightforward yet extended convolution kernel - a _41x41_ box filter. That makes the convolution computationally intense, offering significant room for optimization, and produces a pleasantly blurred output image.
+The blurring effect serves as a quick quality control check to confirm that the filter was applied.
+
+<img src="assets/pebble_filtered.png" width=400 />
+
 
 I'm working locally using **NVIDIA GeForce RTX 4060 Laptop GPU**.
 
