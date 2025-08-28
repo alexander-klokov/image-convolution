@@ -5,7 +5,7 @@
 #define FILTER_RADIUS (N / 2)
 #define TILE_WIDTH 32
 
-__global__ void kernelTiling(
+__global__ void kernelTiling2D(
     unsigned char *d_inputImage,
     unsigned char *d_outputImage,
     int width,

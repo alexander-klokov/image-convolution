@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     dim3 blockDim(TILE_WIDTH, TILE_WIDTH);
     dim3 gridDim((inputImage.width + blockDim.x - 1) / blockDim.x, (inputImage.height + blockDim.y - 1) / blockDim.y);
 
-    std::cout << "Launching kernelTiling2D with " << gridDim.x << "x" << gridDim.y << " blocks and "
+    std::cout << "Launching kernelTiling1D with " << gridDim.x << "x" << gridDim.y << " blocks and "
               << blockDim.x << "x" << blockDim.y << " threads per block.\n";
 
     // Set up CUDA events for timing
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 
     // Launch the kernel
     CHECK_CUDA_ERROR(cudaEventRecord(start));
-    kernelTiling2D<<<gridDim, blockDim>>>(
+    kernelTiling1D<<<gridDim, blockDim>>>(
         d_inputImage,
         d_outputImage,
         inputImage.width,
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     // Calculate elapsed time
     float milliseconds = 0;
     CHECK_CUDA_ERROR(cudaEventElapsedTime(&milliseconds, start, stop));
-    std::cout << "\033[1;34mkernelTiling2D execution time: " << milliseconds << " ms\n\033[0m";
+    std::cout << "\033[1;34mkernelTiling1D execution time: " << milliseconds << " ms\n\033[0m";
 
     // Copy output image from device to host
     CHECK_CUDA_ERROR(cudaMemcpy(outputImage.data.data(), d_outputImage, imageSize, cudaMemcpyDeviceToHost));
