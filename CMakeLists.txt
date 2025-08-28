@@ -9,7 +9,7 @@ include(CheckLanguage)
 check_language(CUDA)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CUDA_COMPUTE_CAPABILITY 89)
+set(CUDA_COMPUTE_CAPABILITY 89) # for NVIDIA GeForce RTX 4060 Laptop GPU, Ada Lovelace architecture
 
 # output directories
 set(OUTPUT_DIR "${PROJECT_SOURCE_DIR}/output")
@@ -20,39 +20,29 @@ file(MAKE_DIRECTORY ${PROFILE_DIR})
 
 find_package(CUDAToolkit REQUIRED COMPONENTS CUDAToolkit::nppc nppi)
 
-# in debug mode, add debug symbols to device code
-# this disables most optimizations and kills performance
-add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-in-ptx>")
-# add_compile_options("--ptxas-options=-v")
+# static library
+add_library(image_utils src/image_utils.cpp)
 
-# Configure header file search paths
+# configure header file search paths
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/src)
-# Configure the source file path to be compiled
+# configure the source file path to be compiled
 aux_source_directory(${PROJECT_SOURCE_DIR}/src SRC)
+
+macro(add_cuda_executable name)
+    add_executable(${name} src/${name}.cu)
+    set_target_properties(${name} PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
+    target_link_libraries(${name} ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif image_utils)
+endmacro()
 
 # generate executables
 ### npp (benchmark)
-add_executable(image_conv_npp src/image_conv_npp.cu src/image_utils.cpp)
+add_executable(image_conv_npp src/image_conv_npp.cu)
 set_target_properties(image_conv_npp PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_npp ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
-### 1a
-add_executable(image_conv_kernel_1a src/image_conv_kernel_1a.cu src/image_utils.cpp)
-set_target_properties(image_conv_kernel_1a PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_kernel_1a ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
-### 1b
-add_executable(image_conv_kernel_1b src/image_conv_kernel_1b.cu src/image_utils.cpp)
-set_target_properties(image_conv_kernel_1b PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_kernel_1b ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
-### 2
-add_executable(image_conv_kernel_2 src/image_conv_kernel_2.cu src/image_utils.cpp)
-set_target_properties(image_conv_kernel_2 PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_kernel_2 ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
-### 3
-add_executable(image_conv_kernel_3 src/image_conv_kernel_3.cu src/image_utils.cpp)
-set_target_properties(image_conv_kernel_3 PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_kernel_3 ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
-### 4
-add_executable(image_conv_kernel_4 src/image_conv_kernel_4.cu src/image_utils.cpp)
-set_target_properties(image_conv_kernel_4 PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
-target_link_libraries(image_conv_kernel_4 ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif)
+target_link_libraries(image_conv_npp ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif image_utils)
+### kernels
+add_cuda_executable(image_conv_kernel_1a)
+add_cuda_executable(image_conv_kernel_1b)
+add_cuda_executable(image_conv_kernel_2)
+add_cuda_executable(image_conv_kernel_3)
+add_cuda_executable(image_conv_kernel_4)
