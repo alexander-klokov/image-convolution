@@ -8,9 +8,8 @@
 * [Kernel 1a: Naive Implementation](#kernel-1a-naive-implementation)
 * [Kernel 1b: Naive Implementation with Optimal Launch Parameters](#kernel-1b-naive-implementation-with-optimal-launch-parameters)
 * [Kernel 2: Constant Propagation](#kernel-2-constant-propagation)
-* [Kernel 3: Tiling 2D](#kernel-3-tiling-2d)
-* [Kernel 4: Tiling 1D](#kernel-4-tiling-1d)
-* [Work in Progress](#work-in-progress)
+* [Kernel 3: Tiling](#kernel-3-tiling)
+* [Kernel 4: Input Padding](#kernel-4-input-padding)
 
 ## Motivation
 
@@ -172,7 +171,7 @@ In fact, I've achieved this dramatic performance boost by following a common sen
 
 At this optimization state, NCU recommends to "balance the number of active cycles across L2 Slices," which suggests the kernel's performance is now being limited by the efficiency of the L2 cache utilization.
 
-## Kernel 3: Tiling 2D
+## Kernel 3: Tiling
 
 This kernel follows a tiling strategy. It breaks the large input image into smaller, overlapping chunks called "tiles":
 - **Load Phase**: Each thread block loads its corresponding tile from global memory into shared memory.
@@ -200,49 +199,26 @@ The Occupancy Calculator reveals a linear dependency between Occupancy and the n
 
 This is a feature of shared memory, which becomes the new limiting factor for occupancy. Unlike registers, which are allocated on a per-thread basis, shared memory is allocated per thread block. The amount of shared memory a block requests is a single, fixed value, regardless of the number of threads within that block. Occupancy increases linearly as more threads are added to each block, until it hits a new limit (1024 threads per block). Note that the theoretical occupancy drops to 66.7% even with the observed significant speedup.
 
-## Kernel 4: Tiling 1D
+## Kernel 4: Input Padding
 
-The previous kernel used a 2D strided loop, which provided a basic form of memory coalescing but could be suboptimal. My new kernel improves upon this by using a single 1D loop with a linear index, which guarantees more efficient memory coalescing.
+After adapting the tiling strategy, I'm getting a complaint from the Profiler regarding "L2 Slices Workload Imbalance" and a guidance to "balance the number of active cycles across L2 Slices."
 
-This change in memory access pattern yielded significant improvements in L2 cache performance:
-- **L2 Cache Throughput increased by 1.7%**: This metric measures the rate of data transfer to and from the GPU's L2 cache. The increase indicates that the 1D tiling kernel, kernelTiling1D, is making more effective use of the available L2 cache bandwidth.
-- **Average L2 Active Cycles decreased by 13.2%**: This metric reflects the average number of clock cycles the L2 cache is occupied. The significant reduction indicates the kernel experiences fewer stalls and wait times for L2 cache access, which is a direct result of the more optimized memory access pattern.
+L2 cache slices are partitions of the GPU's L2 cache. Instead of a single, monolithic L2 cache, the total cache capacity is divided into multiple independent sections. Each slice is a physically separate part of the cache with its own set of memory controllers. When a memory request comes from an SM, a hashing function is used to determine which L2 cache slice contains the requested data. This function ensures that memory addresses are distributed across the slices, allowing for more concurrent access. On my RTX 4060 Laptop GPU, with Ada Lovelace architecture, the L2 cache size is 24 MB.
 
-These memory optimizations led to slight improvements in overall performance:
+L2 slice workload imbalance is primarily caused by non-coalesced memory access. Even if the kernel code assumes proper coalesced memory access, the input dimension may lead to the imbalance.
 
-- **Compute Throughput (%): 93.37**
-- **Memory Throughput (%): 93.37**
-- **Duration (ms): 51**
+When launching a kernel, threads in a half-warp (16 threads) or full-warp (32 threads) try to access contiguous memory locations. If the input image width is not a multiple of 32, the last threads in a row will access data that's not contiguous with the next row, forcing the GPU to make multiple, uncoalesced memory transactions.
+
+This issue may be solved by padding the image's width to be a multiple of 32. Then, every row starts and ends on a boundary that aligns perfectly with a warp's memory requests, allowing for a single, efficient, coalesced transaction.
+
+Introducing the input padding allowed for an achieved performance improvement:
+
+- **Compute Throughput (%): 98.46**
+- **Memory Throughput (%): 98.46**
+- **Duration (ms): 48**
 
 with the following launch parameters:
 
 - **Grid Size: (126, 95, 1)**
 - **Block Size: (32, 32, 1)**
-- **Registers (register/thread): 36**
-
-## Work in Progress
-
-After adapting the tiling strategy, I'm getting the Profiler's guidance to "balance the number of active cycles across L2 Slices."
-
-L2 cache slices are partitions of the GPU's L2 cache. Instead of a single, monolithic L2 cache, the total cache capacity is divided into multiple independent sections. Each slice is a physically separate part of the cache with its own set of memory controllers. When a memory request comes from an SM, a hashing function is used to determine which L2 cache slice contains the requested data. This function ensures that memory addresses are distributed across the slices, allowing for more concurrent access. At my RTX 4060 Laptop GPU, with Ada Lovelace architecture, the L2 cache size is 24 MB.
-
-The _lts__t_sector_hit_rate_ metric represents the proportion of L2 sector lookups that result in a hit. A sector is an aligned 32-byte chunk of memory within a cache line. When a request for data is made, the L2 cache is checked first.
-
-
-Maximum instance value is 52.18% above the average: This tells you that at least one L2 slice is being accessed significantly more often than the others. It's an overworked "hotspot" that is processing more memory requests, which can lead to contention and increased latency.
-
-Minimum instance value is 9.49% below the average: This shows that at least one other L2 slice is being underutilized. It's handling fewer memory requests than the average, meaning a portion of your GPU's L2 cache bandwidth is going unused.
-
-Keep the total number of threads per block the same, but change the shape.
-
-While you can't manually control which slice a particular memory address maps to, ensuring your threads and thread blocks access a wide range of global memory locations will help the hardware distribute the workload
-
-I need to modify my kernel to move away from the squared shape.
-
---
-
-and its instability between runs is a common phenomenon in GPU profiling. This doesn't mean you should ignore it; rather, it highlights the dynamic nature of GPU workloads.
-
-The guidance indicates that some L2 cache slices are being accessed much more frequently than others. This is often due to non-uniform memory access patterns in your kernel.
-
-A coalesced memory access occurs when all threads in a warp (a group of 32 threads) access contiguous, aligned memory locations at the same time. When this happens, the GPU hardware can combine these individual memory requests into a single, efficient transaction, maximizing memory bandwidth.
+- **Registers (register/thread): 29**
