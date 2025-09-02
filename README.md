@@ -222,3 +222,16 @@ with the following launch parameters:
 - **Grid Size: (126, 95, 1)**
 - **Block Size: (32, 32, 1)**
 - **Registers (register/thread): 29**
+
+### Shared Memory Bank Conflicts
+
+When working on this kernel, I mistakenly defined the shared memory array as a _float_, not an _unsigned char_ as previously used. When changing the data type back to unsigned char, the performance dropped, essentially negating the gains.
+
+The primary reason for the performance drop is likely shared memory bank conflicts. On my NVIDIA GeForce RTX 4060, shared memory is divided into 32 banks. Each bank can serve one request per clock cycle. To achieve maximum throughput, threads within a warp (a group of 32 threads that execute in parallel) should access different banks. If two or more threads in the same warp try to access the same bank at the same time, a bank conflict occurs. The hardware then serializes these requests, causing a significant performance loss.
+
+- **Shared memory with float**. A float is 4 bytes. When threads access this array in a strided way, the 4-byte addresses are spread out over different banks, as successive 32-bit words map to successive banks.
+- **Shared memory with unsigned char**. An unsigned char is 1 byte. The same strided access pattern now means that multiple threads are very likely to hit the same memory bank. For example, if _tx_ is the thread index, _sh_tile[ty+j][tx+kCol]_ will often access memory locations that are only 1 byte apart, and since the shared memory banks are typically 4 bytes wide, multiple threads will fall into the same bank, leading to conflicts. This serialization of memory access severely reduces the effective shared memory bandwidth.
+
+### Additional metrics
+
+The metric *Average L2 Active Cycles* droped by -30.85% indicating a significant performance improvement. It means that the new kernel is spending over 30% less time waiting for or actively using the L2 cache.
