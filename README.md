@@ -225,3 +225,24 @@ with the following launch parameters:
 After adapting the tiling strategy, I'm getting the Profiler's guidance to "balance the number of active cycles across L2 Slices."
 
 L2 cache slices are partitions of the GPU's L2 cache. Instead of a single, monolithic L2 cache, the total cache capacity is divided into multiple independent sections. Each slice is a physically separate part of the cache with its own set of memory controllers. When a memory request comes from an SM, a hashing function is used to determine which L2 cache slice contains the requested data. This function ensures that memory addresses are distributed across the slices, allowing for more concurrent access. At my RTX 4060 Laptop GPU, with Ada Lovelace architecture, the L2 cache size is 24 MB.
+
+The _lts__t_sector_hit_rate_ metric represents the proportion of L2 sector lookups that result in a hit. A sector is an aligned 32-byte chunk of memory within a cache line. When a request for data is made, the L2 cache is checked first.
+
+
+Maximum instance value is 52.18% above the average: This tells you that at least one L2 slice is being accessed significantly more often than the others. It's an overworked "hotspot" that is processing more memory requests, which can lead to contention and increased latency.
+
+Minimum instance value is 9.49% below the average: This shows that at least one other L2 slice is being underutilized. It's handling fewer memory requests than the average, meaning a portion of your GPU's L2 cache bandwidth is going unused.
+
+Keep the total number of threads per block the same, but change the shape.
+
+While you can't manually control which slice a particular memory address maps to, ensuring your threads and thread blocks access a wide range of global memory locations will help the hardware distribute the workload
+
+I need to modify my kernel to move away from the squared shape.
+
+--
+
+and its instability between runs is a common phenomenon in GPU profiling. This doesn't mean you should ignore it; rather, it highlights the dynamic nature of GPU workloads.
+
+The guidance indicates that some L2 cache slices are being accessed much more frequently than others. This is often due to non-uniform memory access patterns in your kernel.
+
+A coalesced memory access occurs when all threads in a warp (a group of 32 threads) access contiguous, aligned memory locations at the same time. When this happens, the GPU hardware can combine these individual memory requests into a single, efficient transaction, maximizing memory bandwidth.

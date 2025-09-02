@@ -40,10 +40,9 @@ endmacro()
 add_executable(image_conv_npp src/image_conv_npp.cu)
 set_target_properties(image_conv_npp PROPERTIES CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 target_link_libraries(image_conv_npp ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} CUDA::nppc CUDA::nppif image_utils)
-### kernels
+### kernel runners
 add_cuda_executable(image_conv_kernel_1a)
 add_cuda_executable(image_conv_kernel_1b)
 add_cuda_executable(image_conv_kernel_2)
 add_cuda_executable(image_conv_kernel_3)
 add_cuda_executable(image_conv_kernel_4)
-add_cuda_executable(image_conv_kernel_5)

@@ -52,10 +52,39 @@ int main(int argc, char **argv)
     const float filterValue = 1.0f / filterSize2;
 
     // Define kernel launch parameters
-    dim3 blockDim(TILE_WIDTH, TILE_WIDTH);
-    dim3 gridDim((inputImage.width + blockDim.x - 1) / blockDim.x, (inputImage.height + blockDim.y - 1) / blockDim.y);
+    const int BLOCK_WIDTH = 32;
+    const int BLOCK_HEIGHT = 32;
+    dim3 blockDim(BLOCK_WIDTH, BLOCK_HEIGHT);
+    dim3 gridDim(
+        (inputImage.width + BLOCK_WIDTH - 1) / BLOCK_WIDTH,
+        (inputImage.height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT);
 
-    std::cout << "Launching kernelTiling1D with " << gridDim.x << "x" << gridDim.y << " blocks and "
+    const int PADDING_ALIGNMENT = 32; // Or 32 for warp size
+    int paddedWidth = ((inputImage.width + PADDING_ALIGNMENT - 1) / PADDING_ALIGNMENT) * PADDING_ALIGNMENT;
+    int paddedHeight = ((inputImage.height + PADDING_ALIGNMENT - 1) / PADDING_ALIGNMENT) * PADDING_ALIGNMENT;
+    size_t paddedImageSize = paddedWidth * paddedHeight * sizeof(unsigned char);
+
+    // Allocate padded host memory
+    unsigned char *h_paddedInputImage;
+    CHECK_CUDA_ERROR(cudaMallocHost(&h_paddedInputImage, paddedImageSize));
+
+    // Copy original image data into padded host memory
+    // This is an example, you need to implement this copy carefully
+    for (int y = 0; y < inputImage.height; ++y)
+    {
+        memcpy(h_paddedInputImage + y * paddedWidth,
+               inputImage.data.data() + y * inputImage.width,
+               inputImage.width * sizeof(unsigned char));
+    }
+
+    // Allocate device memory with padding
+    float *d_paddedInputImage;
+    CHECK_CUDA_ERROR(cudaMalloc(&d_paddedInputImage, paddedImageSize));
+
+    // Copy padded host data to padded device buffer
+    CHECK_CUDA_ERROR(cudaMemcpy(d_paddedInputImage, h_paddedInputImage, paddedImageSize, cudaMemcpyHostToDevice));
+
+    std::cout << "Launching kernelTilingPadding with " << gridDim.x << "x" << gridDim.y << " blocks and "
               << blockDim.x << "x" << blockDim.y << " threads per block.\n";
 
     // Set up CUDA events for timing
@@ -65,11 +94,12 @@ int main(int argc, char **argv)
 
     // Launch the kernel
     CHECK_CUDA_ERROR(cudaEventRecord(start));
-    kernelTiling1D<<<gridDim, blockDim>>>(
+    kernelTilingPadding<<<gridDim, blockDim>>>(
         d_inputImage,
         d_outputImage,
         inputImage.width,
         inputImage.height,
+        paddedWidth,
         filterValue);
 
     CHECK_CUDA_ERROR(cudaGetLastError()); // Check for errors during kernel execution
@@ -79,7 +109,7 @@ int main(int argc, char **argv)
     // Calculate elapsed time
     float milliseconds = 0;
     CHECK_CUDA_ERROR(cudaEventElapsedTime(&milliseconds, start, stop));
-    std::cout << "\033[1;34mkernelTiling1D execution time: " << milliseconds << " ms\n\033[0m";
+    std::cout << "\033[1;34mkernelTilingL2Cache execution time: " << milliseconds << " ms\n\033[0m";
 
     // Copy output image from device to host
     CHECK_CUDA_ERROR(cudaMemcpy(outputImage.data.data(), d_outputImage, imageSize, cudaMemcpyDeviceToHost));
