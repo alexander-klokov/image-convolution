@@ -233,5 +233,5 @@ The primary reason for the performance drop is likely shared memory bank conflic
 - **Shared memory with unsigned char**. An unsigned char is 1 byte. The same strided access pattern now means that multiple threads are very likely to hit the same memory bank. For example, if _tx_ is the thread index, _sh_tile[ty+j][tx+kCol]_ will often access memory locations that are only 1 byte apart, and since the shared memory banks are typically 4 bytes wide, multiple threads will fall into the same bank, leading to conflicts. This serialization of memory access severely reduces the effective shared memory bandwidth.
 
 ### Additional metrics
-
-The metric *Average L2 Active Cycles* droped by -30.85% indicating a significant performance improvement. It means that the new kernel is spending over 30% less time waiting for or actively using the L2 cache.
+- The metric *Average L2 Active Cycles* droped by -30.85% indicating a significant performance improvement. It means that the new kernel is spending over 30% less time waiting for or actively using the L2 cache.
+- The _registers_ usage dropped from 36 to 29. This reduction significantly increases the GPU's ability to hide latency by allowing more threads to run concurrently.
