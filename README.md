@@ -21,6 +21,7 @@ I plan to develop a basic image convolution CUDA kernel and enhance it through i
 
 - High occupancy does not guarantee high performance.
 - Following common sense could lead to a dramatic performance boost.
+- For this particular kernel, using the _float_ type instead of the "more reasonable" _unsigned char_ allowed me to avoid shared memory bank conflicts.
 
 ## Input image and the Convolution Kernel
 
