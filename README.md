@@ -9,7 +9,8 @@
 * [Kernel 1b: Naive Implementation with Optimal Launch Parameters](#kernel-1b-naive-implementation-with-optimal-launch-parameters)
 * [Kernel 2: Constant Propagation](#kernel-2-constant-propagation)
 * [Kernel 3: Tiling](#kernel-3-tiling)
-* [Kernel 4: Input Padding](#kernel-4-input-padding)
+* [Kernel 4a: Input Padding](#kernel-4a-input-padding)
+* [Kernel 4b: Input Padding with Optimal Launch Parameters](#kernel-4b-input-padding-with-optimal-launch-parameters)
 * [Conclusions](#conclusions)
 * [Acknowledgements](#acknowledgements)
 
@@ -201,7 +202,7 @@ The Occupancy Calculator reveals a linear dependency between Occupancy and the n
 
 This is a feature of shared memory, which becomes the new limiting factor for occupancy. Unlike registers, which are allocated on a per-thread basis, shared memory is allocated per thread block. The amount of shared memory a block requests is a single, fixed value, regardless of the number of threads within that block. Occupancy increases linearly as more threads are added to each block, until it hits a new limit (1024 threads per block). Note that the theoretical occupancy drops to 66.7% even with the observed significant speedup.
 
-## Kernel 4: Input Padding
+## Kernel 4a: Input Padding
 
 After adapting the tiling strategy, I'm getting a complaint from the Profiler regarding "L2 Slices Workload Imbalance" and a guidance to "balance the number of active cycles across L2 Slices."
 
@@ -237,6 +238,26 @@ The primary reason for the performance drop is likely shared memory bank conflic
 ### Additional metrics
 - The metric *Average L2 Active Cycles* droped by -30.85% indicating a significant performance improvement. It means that the new kernel is spending over 30% less time waiting for or actively using the L2 cache.
 - The _registers_ usage dropped from 36 to 29. This reduction significantly increases the GPU's ability to hide latency by allowing more threads to run concurrently.
+
+## Kernel 4b: Input Padding with Optimal Launch Parameters
+
+After applying the input image padding, I figured out that my theoretical occupancy was 66.7%. That was caused by the 32x32 block size, which is equal to 1024 threads, so each block contains _1024 / 32 = 32_ warps. My RTX 4060 SM can support a maximum of 48 warps. That means each block could use only two-thirds of the available warps, and only one block could be allocated per SM.
+
+After transitioning to a 32x16 block size, I was operating 512 threads. That translated to _512 / 32 = 16_ warps. This allowed me to launch three blocks simultaneously and use the full capacity of my card.
+
+The kernel was performing near the theoretical peak for both compute and memory operations:
+
+- **Compute Throughput (%): 99.57**
+- **Memory Throughput (%): 99.57**
+- **Duration (ms): 47.55**
+
+with the following launch parameters:
+
+- **Grid Size: (126, 189, 1)**
+- **Block Size: (32, 16, 1)**
+- **Registers (register/thread): 29**
+
+Interestingly, after this optimization, I'm getting the "L2 Sliced Workload Imbalance" warning again.
 
 ## Conclusions
 
