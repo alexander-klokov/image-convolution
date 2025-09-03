@@ -10,6 +10,8 @@
 * [Kernel 2: Constant Propagation](#kernel-2-constant-propagation)
 * [Kernel 3: Tiling](#kernel-3-tiling)
 * [Kernel 4: Input Padding](#kernel-4-input-padding)
+* [Conclusions](#conclusions)
+* [Acknowledgements](#acknowledgements)
 
 ## Motivation
 
@@ -33,7 +35,6 @@ I’m using a straightforward yet extended convolution kernel - a _41x41_ box fi
 The blurring effect serves as a quick quality control check to confirm that the filter was applied.
 
 <img src="assets/pebble_filtered.png" width=400 />
-
 
 I'm working locally using **NVIDIA GeForce RTX 4060 Laptop GPU**.
 
@@ -236,3 +237,30 @@ The primary reason for the performance drop is likely shared memory bank conflic
 ### Additional metrics
 - The metric *Average L2 Active Cycles* droped by -30.85% indicating a significant performance improvement. It means that the new kernel is spending over 30% less time waiting for or actively using the L2 cache.
 - The _registers_ usage dropped from 36 to 29. This reduction significantly increases the GPU's ability to hide latency by allowing more threads to run concurrently.
+
+## Conclusions
+
+ I began with a naive kernel and iteratively improved it by following the guidance of the Nsight Compute profiler. That allowed me to overcome the limiting factors—first register pressure, then L2 cache imbalance. However, the most powerful optimization was simply following common sense: when I stopped recalculating the constant value at each thread.
+
+I was able to achieve 98.5% of memory and compute throughput after a few iterations.
+
+<img src="assets/results_compute.svg" width=400 />
+
+My kernel surprisingly outperforms the benchmark NPP function, with a duration of 48ms versus 93ms:
+
+<img src="assets/results_duration.svg" width=400 />
+
+The benchmark duration is reported by NCU, so I assume this is the "pure" kernel execution time, excluding host-side API overhead.
+
+The discrepancy can be attributed to the fundamental difference between a general-purpose library and a highly specialized custom kernel. The NPP library's kernels are designed for broad utility. They are highly optimized but must work correctly and efficiently across a wide range of hardware architectures and image sizes. These kernels are pre-compiled and selected at runtime. While they are close to optimal, they are not designed to be a perfect fit for every possible combination.
+
+My custom kernel, however, is a perfect fit. I specifically tuned it for a single, known problem: applying a 41x41 box filter to a single-channel image on the specific architecture of my RTX 4060. This allowed me to make micro-optimizations that a general library could not.
+
+With that, I did run Nsight Compute in a basic mode and collected high-level metrics. When running the profiler in a full mode, I'm getting new guidance. One of them, "L1TEX Global Load Access Pattern," is pretty promising, with an estimated speedup of about 54%. I don't believe that at the moment.
+
+Anyway, I want to stop optimization at this point. The optimization curves look like they're reaching a plateau, but it's likely that I'll make a separate project to learn about those deeper optimization techniques.
+
+## Acknowledgements
+
+- This work was inspired by [Simon Boehm](https://siboehm.com)
+- The kernels were plotted with [Excalidraw](https://excalidraw.com)
