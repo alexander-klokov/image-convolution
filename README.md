@@ -46,7 +46,7 @@ _nppiFilter_8u_C1R_ is a CPU function, not a GPU kernel. When invoked, it does t
 
 - prepares data structures and parameters, including calculating the optimal _gridSize_ and _blockSize_;
 - launches pre-compiled kernels optimized for the input image and the specific GPU architecture;
-- Handles synchronization and data flow.
+- handles synchronization and data flow.
 
 The automatically selected kernel _ForEachPixelNaiveInLargeImage_ demonstrated nearly perfect performance:
 
@@ -179,6 +179,8 @@ At this optimization state, NCU recommends to "balance the number of active cycl
 
 This kernel follows a tiling strategy. It breaks the large input image into smaller, overlapping chunks called "tiles":
 - **Load Phase**: Each thread block loads its corresponding tile from global memory into shared memory.
+- **Synchronization**: To ensure that all threads in the block have finished loading their piece of the tile data from 
+global memory.
 - **Compute Phase**: Each thread within the block then performs the computation using the data from the fast shared memory instead of repeatedly accessing the slow global memory.
 
 During the Load Phase, the data is read in a coalesced manner to allow threads in a warp to access contiguous memory addresses. For the filter, I am following the constant propagation strategy.
@@ -205,7 +207,7 @@ This is a feature of shared memory, which becomes the new limiting factor for oc
 
 ## Kernel 4a: Input Padding
 
-After adapting the tiling strategy, I'm getting a complaint from the Profiler regarding "L2 Slices Workload Imbalance" and a guidance to "balance the number of active cycles across L2 Slices."
+After adapting the tiling strategy, I'm still getting the complaint from the Profiler regarding "L2 Slices Workload Imbalance" and a guidance to "balance the number of active cycles across L2 Slices."
 
 L2 cache slices are partitions of the GPU's L2 cache. Instead of a single, monolithic L2 cache, the total cache capacity is divided into multiple independent sections. Each slice is a physically separate part of the cache with its own set of memory controllers. When a memory request comes from an SM, a hashing function is used to determine which L2 cache slice contains the requested data. This function ensures that memory addresses are distributed across the slices, allowing for more concurrent access. On my RTX 4060 Laptop GPU, with Ada Lovelace architecture, the L2 cache size is 24 MB.
 
@@ -215,7 +217,7 @@ When launching a kernel, threads in a half-warp (16 threads) or full-warp (32 th
 
 This issue may be solved by padding the image's width to be a multiple of 32. Then, every row starts and ends on a boundary that aligns perfectly with a warp's memory requests, allowing for a single, efficient, coalesced transaction.
 
-Introducing the input padding allowed for an achieved performance improvement:
+Introducing the input padding enabled an achieved performance improvement:
 
 - **Compute Throughput (%): 98.46**
 - **Memory Throughput (%): 98.46**
@@ -231,7 +233,7 @@ with the following launch parameters:
 
 When working on this kernel, I mistakenly defined the shared memory array as a _float_, not an _unsigned char_ as previously used. When changing the data type back to unsigned char, the performance dropped, essentially negating the gains.
 
-The primary reason for the performance drop is likely shared memory bank conflicts. On my NVIDIA GeForce RTX 4060, shared memory is divided into 32 banks. Each bank can serve one request per clock cycle. To achieve maximum throughput, threads within a warp (a group of 32 threads that execute in parallel) should access different banks. If two or more threads in the same warp try to access the same bank at the same time, a bank conflict occurs. The hardware then serializes these requests, causing a significant performance loss.
+The primary reason for the performance drop is likely shared memory bank conflicts. On my NVIDIA GeForce RTX 4060, shared memory is divided into 32 banks. Each bank can serve one request per clock cycle. To achieve maximum throughput, threads within a warp should access different banks. If two or more threads in the same warp try to access the same bank at the same time, a bank conflict occurs. The hardware then serializes these requests, causing a significant performance loss.
 
 - **Shared memory with float**. A float is 4 bytes. When threads access this array in a strided way, the 4-byte addresses are spread out over different banks, as successive 32-bit words map to successive banks.
 - **Shared memory with unsigned char**. An unsigned char is 1 byte. The same strided access pattern now means that multiple threads are very likely to hit the same memory bank. For example, if _tx_ is the thread index, _sh_tile[ty+j][tx+kCol]_ will often access memory locations that are only 1 byte apart, and since the shared memory banks are typically 4 bytes wide, multiple threads will fall into the same bank, leading to conflicts. This serialization of memory access severely reduces the effective shared memory bandwidth.
@@ -262,9 +264,9 @@ Interestingly, after this optimization, I'm getting the "L2 Sliced Workload Imba
 
 ## Conclusions
 
- I began with a naive kernel and iteratively improved it by following the guidance of the Nsight Compute profiler. That allowed me to overcome the limiting factors—first register pressure, then L2 cache imbalance. However, the most powerful optimization was simply following common sense: when I stopped recalculating the constant value at each thread.
+ I began with a naive kernel and iteratively improved it by following the guidance of the Nsight Compute profiler. That allowed me to overcome the limiting factors - first register pressure, then L2 cache imbalance. However, the most powerful optimization was simply following common sense: when I stopped recalculating the constant value at each thread.
 
-I was able to achieve 99.57% of memory and compute throughput after a few iterations.
+I was able to achieve 99.57% of memory and compute throughput after a few iterations:
 
 <img src="assets/results_compute.svg" width=400 />
 
@@ -278,9 +280,7 @@ The discrepancy can be attributed to the fundamental difference between a genera
 
 My custom kernel, however, is a perfect fit. I specifically tuned it for a single, known problem: applying a 41x41 box filter to a single-channel image on the specific architecture of my RTX 4060. This allowed me to make micro-optimizations that a general library could not.
 
-With that, I did run Nsight Compute in a basic mode and collected high-level metrics. When running the profiler in a full mode, I'm getting new guidance. One of them, "L1TEX Global Load Access Pattern", is pretty promising, with an estimated speedup of about 54%. It's hard to believe that right now.
-
-Anyway, I want to stop optimization at this point. The optimization curves look like they're reaching a plateau, but it's likely that I'll make a separate project to learn about those deeper optimization techniques.
+Within this project, I ran Nsight Compute in a _basic_ mode and collected high-level metrics. When running the profiler in a _full_ mode, I'm getting new guidance. One of them, "L1TEX Global Load Access Pattern," is pretty promising, with an estimated speedup of about 54%. It's hard to believe that right now. Anyway, I want to stop optimization at this point. The optimization curves look like they're reaching a plateau, but it's likely that I'll make a separate project to learn about those deeper optimization techniques.
 
 ## Acknowledgements
 
