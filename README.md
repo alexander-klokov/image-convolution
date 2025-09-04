@@ -20,6 +20,8 @@ Starting this study project, I was inspired by _Simon Boehm_ and his [post](http
 
 I plan to develop a basic image convolution CUDA kernel and enhance it through iterative optimization techniques. For performance comparison, I will use the _nppiFilter_8u_C1R_ function from the NVIDIA Performance Primitives (NPP) library as a benchmark.
 
+I'm working locally using **NVIDIA GeForce RTX 4060 Laptop GPU**.
+
 ## Lessons Learned
 
 - High occupancy does not guarantee high performance, but you should seek high occupancy.
@@ -37,8 +39,6 @@ I’m using a straightforward yet extended convolution kernel - a _41x41_ box fi
 The blurring effect serves as a quick quality control check to confirm that the filter was applied.
 
 <img src="assets/pebble_filtered.png" width=400 />
-
-I'm working locally using **NVIDIA GeForce RTX 4060 Laptop GPU**.
 
 ## Benchmark: nppiFilter_8u_C1R
 
@@ -239,7 +239,7 @@ The primary reason for the performance drop is likely shared memory bank conflic
 - **Shared memory with unsigned char**. An unsigned char is 1 byte. The same strided access pattern now means that multiple threads are very likely to hit the same memory bank. For example, if _tx_ is the thread index, _sh_tile[ty+j][tx+kCol]_ will often access memory locations that are only 1 byte apart, and since the shared memory banks are typically 4 bytes wide, multiple threads will fall into the same bank, leading to conflicts. This serialization of memory access severely reduces the effective shared memory bandwidth.
 
 ### Additional metrics
-- The metric *Average L2 Active Cycles* droped by -30.85% indicating a significant performance improvement. It means that the new kernel is spending over 30% less time waiting for or actively using the L2 cache.
+- The metric *Average L2 Active Cycles* dropped by -30.85% indicating a significant performance improvement. It means that the new kernel is spending over 30% less time waiting for or actively using the L2 cache.
 - The _registers_ usage dropped from 36 to 29. This reduction significantly increases the GPU's ability to hide latency by allowing more threads to run concurrently.
 
 ## Kernel 4b: Input Padding with Optimal Launch Parameters
