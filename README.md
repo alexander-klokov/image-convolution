@@ -116,7 +116,7 @@ The Occupancy Calculator suggests a few options for optimal threads per block, e
 
 <img src="assets/occupancy_1b.png" />
 
-The occupancy plot reveals a non-linear relationship. The occupancy first remains constant at 33% until it reaches 32 threads per block. This plateau is a direct consequence of the GPU's hardware-based scheduling of warps; the kernel's resource usage allows for only three warps to be resident on the SM, regardless of a block size from 1 to 32 threads.
+The occupancy plot reveals a non-linear relationship. The occupancy first remains constant at 33% until it reaches 32 threads per block. This plateau is a direct consequence of the GPU's hardware-based scheduling of warps. Whether a block has 1, 16, or 32 threads, the SM still treats it as occupying one full warp's worth of resources.
 
 After 32 threads, the occupancy increases linearly to 67% until 48 threads per block. This rise indicates that the kernel's resource requirements now allow for a higher number of resident warps. The occupancy then varies with peaks and valleys as the block size increases. These fluctuations are typical when the thread block size is not a clean multiple of the warp size (32), causing less-than-optimal resource utilization due to the GPU’s allocation granularity.
 
