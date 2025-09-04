@@ -241,7 +241,7 @@ The primary reason for the performance drop is likely shared memory bank conflic
 
 ## Kernel 4b: Input Padding with Optimal Launch Parameters
 
-After applying the input image padding, I figured out that my theoretical occupancy was 66.7%. That was caused by the 32x32 block size, which is equal to 1024 threads, so each block contains _1024 / 32 = 32_ warps. My RTX 4060 SM can support a maximum of 48 warps. That means each block could use only two-thirds of the available warps, and only one block could be allocated per SM.
+After applying the input image padding, I figured out that my theoretical occupancy was 66.7%. That was caused by the 32x32 block size, which was equal to 1024 threads, so each block contained _1024 / 32 = 32_ warps. My RTX 4060 SM can support a maximum of 48 warps. That means each block could use only two-thirds of the available warps, and only one block could be allocated per SM.
 
 After transitioning to a 32x16 block size, I was operating 512 threads. That translated to _512 / 32 = 16_ warps. This allowed me to launch three blocks simultaneously and use the full capacity of my card.
 
