@@ -22,7 +22,8 @@ I plan to develop a basic image convolution CUDA kernel and enhance it through i
 
 ## Lessons Learned
 
-- High occupancy does not guarantee high performance.
+- High occupancy does not guarantee high performance, but you should seek high occupancy.
+- Know your hardware. Use all available warps.
 - Following common sense could lead to a dramatic performance boost.
 - For this particular kernel, using the _float_ type instead of the "more reasonable" _unsigned char_ allowed me to avoid shared memory bank conflicts.
 
@@ -263,7 +264,7 @@ Interestingly, after this optimization, I'm getting the "L2 Sliced Workload Imba
 
  I began with a naive kernel and iteratively improved it by following the guidance of the Nsight Compute profiler. That allowed me to overcome the limiting factors—first register pressure, then L2 cache imbalance. However, the most powerful optimization was simply following common sense: when I stopped recalculating the constant value at each thread.
 
-I was able to achieve 98.5% of memory and compute throughput after a few iterations.
+I was able to achieve 99.57% of memory and compute throughput after a few iterations.
 
 <img src="assets/results_compute.svg" width=400 />
 
@@ -277,7 +278,7 @@ The discrepancy can be attributed to the fundamental difference between a genera
 
 My custom kernel, however, is a perfect fit. I specifically tuned it for a single, known problem: applying a 41x41 box filter to a single-channel image on the specific architecture of my RTX 4060. This allowed me to make micro-optimizations that a general library could not.
 
-With that, I did run Nsight Compute in a basic mode and collected high-level metrics. When running the profiler in a full mode, I'm getting new guidance. One of them, "L1TEX Global Load Access Pattern", is pretty promising, with an estimated speedup of about 54%. I don't believe that at the moment.
+With that, I did run Nsight Compute in a basic mode and collected high-level metrics. When running the profiler in a full mode, I'm getting new guidance. One of them, "L1TEX Global Load Access Pattern", is pretty promising, with an estimated speedup of about 54%. It's hard to believe that right now.
 
 Anyway, I want to stop optimization at this point. The optimization curves look like they're reaching a plateau, but it's likely that I'll make a separate project to learn about those deeper optimization techniques.
 
