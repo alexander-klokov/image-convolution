@@ -11,8 +11,7 @@
 * [Kernel 3: Tiling](#kernel-3-tiling)
 * [Kernel 4a: Input Padding](#kernel-4a-input-padding)
 * [Kernel 4b: Input Padding with Optimal Launch Parameters](#kernel-4b-input-padding-with-optimal-launch-parameters)
-* [Conclusions](#conclusions)
-* [Acknowledgements](#acknowledgements)
+* [Wrapping Up](#wrapping-up)
 
 ## Motivation
 
@@ -24,19 +23,20 @@ I'm working locally using **NVIDIA GeForce RTX 4060 Laptop GPU**.
 
 ## Lessons Learned
 
+- Following common sense could lead to a dramatic performance boost.
 - High occupancy does not guarantee high performance, but you should seek high occupancy.
 - Know your hardware. Use all available warps.
-- Following common sense could lead to a dramatic performance boost.
-- For this particular kernel, using the _float_ type instead of the "more reasonable" _unsigned char_ allowed me to avoid shared memory bank conflicts.
+- Even if the kernel code assumes proper coalesced memory access, the input dimension may lead to the imbalance.
+- For this particular kernel, using the float type instead of the “more reasonable” unsigned char allowed me to avoid shared memory bank conflicts.
 
 ## Input image and the Convolution Kernel
 
-As input, I am taking a PGM image. A PGM image (Portable Gray Map) is a straightforward file format for storing 2D grayscale images, with each pixel representing a shade of gray. The single channel of the image simplifies the problem.
+As input, I am taking a PGM (Portable Gray Map) image. This is a straightforward file format for storing 2D grayscale images, with each pixel representing a shade of gray. The single channel of the image simplifies the problem. The image dimensions are 4032x3024:
 
 <img src="assets/pebble.jpg" width=400 />
 
 I’m using a straightforward yet extended convolution kernel - a _41x41_ box filter. That makes the convolution computationally intense, offering significant room for optimization, and produces a pleasantly blurred output image.
-The blurring effect serves as a quick quality control check to confirm that the filter was applied.
+The blurring effect provides a quick quality control check, confirming that the filter was applied.
 
 <img src="assets/pebble_filtered.png" width=400 />
 
@@ -96,14 +96,14 @@ Additional metrics:
 
 - **Block Limit Registers (block): 1**. This means only one thread block can fit on an SM at a time. 
 - **Block Limit Shared Mem (block): 8**. This shows that if my kernel were only limited by its shared memory usage, 8 blocks could theoretically run concurrently on a single SM.
-- **Block Limit Warps (block): 1**. This indicates that my kernel's block size of 1024 threads is equal to the maximum number of threads an SM can execute at once. Note, the Ada Lovelace architecture of my RTX 4060 can have up to 64 active warps per SM.
+- **Block Limit Warps (block): 1**. This indicates that my kernel's block size of 1024 threads is equal to the maximum number of threads an SM can execute at once. Note, the Ada Lovelace architecture of my RTX 4060 can have up to 48 active warps per SM.
 - **Block Limit SM (block):	24**. This metric represents the maximum number of thread blocks that can be active on an SM, based on the architecture of the GPU itself. It shows that my kernel is nowhere near the SM's physical block limit.
 
 ## Kernel 1b: Naive Implementation with Optimal Launch Parameters
 
 My achieved occupancy (64.33%) is very close to the theoretical occupancy (66.7%). This suggests that the kernel is performing well, and my primary bottleneck is the theoretical limit itself.
 
-The primary reason for my low occupancy is the high number of registers per thread. On my RTX 4060's SM, the total number of registers is limited (65,536). When my kernel requires 56 registers for each of its 1024 threads, the total number of registers per thread block is 1024 threads × 56 registers/thread = 57,344 registers. Since an SM has 65,536 registers, it can only hold one thread block at a time (57,344 / 65,536 = 1.14), which rounds down to one. Because only one block can be active at a time, my SM is running a maximum of 32 warps (1024 threads / 32 threads per warp; the NCU report shows Achieved Active Warps per SM equal to 30.88). This is far below the hardware maximum of 64 warps on a single SM of my GPU.
+The primary reason for my low occupancy is the high number of registers per thread. On my RTX 4060's SM, the total number of registers is limited (65,536). When my kernel requires 56 registers for each of its 1024 threads, the total number of registers per thread block is 1024 threads × 56 registers/thread = 57,344 registers. Since an SM has 65,536 registers, it can only hold one thread block at a time (57,344 / 65,536 = 1.14), which rounds down to one. Because only one block can be active at a time, my SM is running a maximum of 32 warps (1024 threads / 32 threads per warp; the NCU report shows Achieved Active Warps per SM equal to 30.88). This translates to _32 / 48 = 66.7%_ occupancy.
 
 To increase occupancy, I need to reduce the resource usage per block. I have two main options:
 
@@ -262,7 +262,7 @@ with the following launch parameters:
 
 Interestingly, after this optimization, I'm getting the "L2 Sliced Workload Imbalance" warning again.
 
-## Conclusions
+## Wrapping Up
 
  I began with a naive kernel and iteratively improved it by following the guidance of the Nsight Compute profiler. That allowed me to overcome the limiting factors - first register pressure, then L2 cache imbalance. However, the most powerful optimization was simply following common sense: when I stopped recalculating the constant value at each thread.
 
@@ -282,7 +282,6 @@ My custom kernel, however, is a perfect fit. I specifically tuned it for a singl
 
 Within this project, I ran Nsight Compute in a _basic_ mode and collected high-level metrics. When running the profiler in a _full_ mode, I'm getting new guidance. One of them, "L1TEX Global Load Access Pattern," is pretty promising, with an estimated speedup of about 54%. It's hard to believe that right now. Anyway, I want to stop optimization at this point. The optimization curves look like they're reaching a plateau, but it's likely that I'll make a separate project to learn about those deeper optimization techniques.
 
-## Acknowledgements
+This work was inspired by [Simon Boehm](https://siboehm.com)
 
-- This work was inspired by [Simon Boehm](https://siboehm.com)
-- The kernels were plotted with [Excalidraw](https://excalidraw.com)
+The kernels were plotted with [Excalidraw](https://excalidraw.com)
